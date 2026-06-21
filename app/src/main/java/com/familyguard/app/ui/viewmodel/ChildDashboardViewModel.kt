@@ -15,6 +15,7 @@ import com.familyguard.app.domain.usecase.sos.TriggerSosUseCase
 import com.familyguard.app.security.AuditAction
 import com.familyguard.app.security.AuditLogger
 import com.familyguard.app.security.Actor
+import com.familyguard.app.service.AnomalyDetectionService
 import com.familyguard.app.service.LocationTrackingService
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -158,6 +159,10 @@ class ChildDashboardViewModel @Inject constructor(
     private fun startLocationTracking() {
         val intent = Intent(context, LocationTrackingService::class.java)
         context.startForegroundService(intent)
+
+        // Also start anomaly detection service
+        val anomalyIntent = Intent(context, AnomalyDetectionService::class.java)
+        context.startForegroundService(anomalyIntent)
     }
 
     private fun stopLocationTracking() {
@@ -165,6 +170,12 @@ class ChildDashboardViewModel @Inject constructor(
             action = "ACTION_STOP"
         }
         context.startService(intent)
+
+        // Also stop anomaly detection service
+        val anomalyIntent = Intent(context, AnomalyDetectionService::class.java).apply {
+            action = "ACTION_STOP"
+        }
+        context.startService(anomalyIntent)
     }
 
     private fun formatTime(timestamp: Long): String {

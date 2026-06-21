@@ -43,6 +43,11 @@ object DatabaseModule {
     @Provides fun provideSyncQueueDao(db: FamilyGuardDatabase): SyncQueueDao = db.syncQueueDao()
     @Provides fun provideDeviceProfileDao(db: FamilyGuardDatabase): DeviceProfileDao = db.deviceProfileDao()
     @Provides fun provideFamilyGroupDao(db: FamilyGuardDatabase): FamilyGroupDao = db.familyGroupDao()
+    @Provides fun provideAppUsageStatsDao(db: FamilyGuardDatabase): AppUsageStatsDao = db.appUsageStatsDao()
+    @Provides fun provideNotificationCountDao(db: FamilyGuardDatabase): NotificationCountDao = db.notificationCountDao()
+    @Provides fun provideAnomalyAlertDao(db: FamilyGuardDatabase): AnomalyAlertDao = db.anomalyAlertDao()
+    @Provides fun provideUsageBaselineDao(db: FamilyGuardDatabase): UsageBaselineDao = db.usageBaselineDao()
+    @Provides fun provideCommunicationMetadataDao(db: FamilyGuardDatabase): CommunicationMetadataDao = db.communicationMetadataDao()
 }
 
 @Module

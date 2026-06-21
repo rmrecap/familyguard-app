@@ -13,9 +13,14 @@ import com.familyguard.app.data.local.entity.*
         ConsentRecordEntity::class,
         SyncQueueEntity::class,
         DeviceProfileEntity::class,
-        FamilyGroupEntity::class
+        FamilyGroupEntity::class,
+        AppUsageStatsEntity::class,
+        NotificationCountEntity::class,
+        AnomalyAlertEntity::class,
+        UsageBaselineEntity::class,
+        CommunicationMetadataEntity::class
     ],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 abstract class FamilyGuardDatabase : RoomDatabase() {
@@ -26,4 +31,9 @@ abstract class FamilyGuardDatabase : RoomDatabase() {
     abstract fun syncQueueDao(): SyncQueueDao
     abstract fun deviceProfileDao(): DeviceProfileDao
     abstract fun familyGroupDao(): FamilyGroupDao
+    abstract fun appUsageStatsDao(): AppUsageStatsDao
+    abstract fun notificationCountDao(): NotificationCountDao
+    abstract fun anomalyAlertDao(): AnomalyAlertDao
+    abstract fun usageBaselineDao(): UsageBaselineDao
+    abstract fun communicationMetadataDao(): CommunicationMetadataDao
 }
