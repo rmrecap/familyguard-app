@@ -31,7 +31,8 @@ fun ConsentSetupScreen(
                 ConsentItem(Feature.LOCATION_SHARING, Icons.Default.LocationOn, true),
                 ConsentItem(Feature.SOS, Icons.Default.Warning, true),
                 ConsentItem(Feature.GEOFENCE, Icons.Default.Fence, true),
-                ConsentItem(Feature.SCREEN_TIME, Icons.Default.Timer, false)
+                ConsentItem(Feature.SCREEN_TIME, Icons.Default.Timer, false),
+                ConsentItem(Feature.COMMUNICATION_TRACKING, Icons.Default.Phone, false)
             )
         )
     }

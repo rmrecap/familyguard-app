@@ -66,6 +66,11 @@ class ChildDashboardViewModel @Inject constructor(
 
             val isTracking = consentMap[Feature.LOCATION_SHARING.id] == true
 
+            val isContextualActive = consentMap[Feature.SCREEN_TIME.id] == true || consentMap[Feature.COMMUNICATION_TRACKING.id] == true
+            if (isContextualActive) {
+                startContextualSync()
+            }
+
             _uiState.value = _uiState.value.copy(
                 isLoading = false,
                 isTracking = isTracking,
@@ -97,11 +102,22 @@ class ChildDashboardViewModel @Inject constructor(
                 if (feature == Feature.LOCATION_SHARING) {
                     startLocationTracking()
                 }
+                if (feature == Feature.SCREEN_TIME || feature == Feature.COMMUNICATION_TRACKING) {
+                    startContextualSync()
+                }
             } else {
                 revokeConsentUseCase(feature.id, deviceId)
 
                 if (feature == Feature.LOCATION_SHARING) {
                     stopLocationTracking()
+                }
+                val activeConsents = consentDao.getActiveConsents(deviceId)
+                val hasOtherActive = activeConsents.any { 
+                    (it.featureId == Feature.SCREEN_TIME.id || it.featureId == Feature.COMMUNICATION_TRACKING.id) && 
+                    it.featureId != feature.id && it.isActive 
+                }
+                if (!hasOtherActive && (feature == Feature.SCREEN_TIME || feature == Feature.COMMUNICATION_TRACKING)) {
+                    stopContextualSync()
                 }
             }
 
@@ -176,6 +192,18 @@ class ChildDashboardViewModel @Inject constructor(
             action = "ACTION_STOP"
         }
         context.startService(anomalyIntent)
+    }
+
+    private fun startContextualSync() {
+        val intent = Intent(context, com.familyguard.app.service.ContextualSyncService::class.java)
+        context.startForegroundService(intent)
+    }
+
+    private fun stopContextualSync() {
+        val intent = Intent(context, com.familyguard.app.service.ContextualSyncService::class.java).apply {
+            action = "ACTION_STOP"
+        }
+        context.startService(intent)
     }
 
     private fun formatTime(timestamp: Long): String {

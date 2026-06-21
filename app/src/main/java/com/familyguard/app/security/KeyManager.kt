@@ -12,13 +12,23 @@ import javax.crypto.SecretKey
 import javax.inject.Inject
 import javax.inject.Singleton
 
+import com.familyguard.app.data.local.PreferencesManager
+
 @Singleton
 class KeyManager @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val preferencesManager: PreferencesManager
 ) {
     private val keyStore = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
 
     fun getDataEncryptionKey(): SecretKey {
+        val groupId = preferencesManager.getFamilyGroupId()
+        if (groupId.isNotEmpty()) {
+            val keyBytes = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(groupId.toByteArray(Charsets.UTF_8))
+            return javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+        }
+
         val alias = "familyguard_data_key"
 
         if (keyStore.containsAlias(alias)) {

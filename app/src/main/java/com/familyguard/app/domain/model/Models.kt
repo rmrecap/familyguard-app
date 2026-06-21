@@ -120,6 +120,12 @@ enum class Feature(
         "Screen Time",
         "Track and manage app usage",
         "timer"
+    ),
+    COMMUNICATION_TRACKING(
+        "communication_tracking",
+        "Communication Patterns",
+        "Monitor call frequency and metadata for safety indicators",
+        "call"
     )
 }
 

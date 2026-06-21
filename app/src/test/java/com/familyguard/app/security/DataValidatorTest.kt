@@ -275,4 +275,17 @@ class DataValidatorTest {
         val result = dataValidator.validateData(data, "Test")
         assertTrue(result is DataValidator.ValidationResult.Valid)
     }
+
+    @Test
+    fun `validateData allows call log metadata`() {
+        val data = mapOf(
+            "durationSeconds" to "120",
+            "callType" to "INCOMING",
+            "totalCallsToday" to "5",
+            "callsLastHour" to "2"
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Valid)
+    }
 }

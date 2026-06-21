@@ -48,6 +48,7 @@ object DatabaseModule {
     @Provides fun provideAnomalyAlertDao(db: FamilyGuardDatabase): AnomalyAlertDao = db.anomalyAlertDao()
     @Provides fun provideUsageBaselineDao(db: FamilyGuardDatabase): UsageBaselineDao = db.usageBaselineDao()
     @Provides fun provideCommunicationMetadataDao(db: FamilyGuardDatabase): CommunicationMetadataDao = db.communicationMetadataDao()
+    @Provides fun provideCallLogMetadataDao(db: FamilyGuardDatabase): CallLogMetadataDao = db.callLogMetadataDao()
 }
 
 @Module
@@ -56,8 +57,11 @@ object SecurityModule {
 
     @Provides
     @Singleton
-    fun provideKeyManager(@ApplicationContext context: Context): KeyManager {
-        return KeyManager(context)
+    fun provideKeyManager(
+        @ApplicationContext context: Context,
+        preferencesManager: com.familyguard.app.data.local.PreferencesManager
+    ): KeyManager {
+        return KeyManager(context, preferencesManager)
     }
 
     @Provides

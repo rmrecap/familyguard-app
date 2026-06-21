@@ -146,7 +146,13 @@ class DataValidator @Inject constructor() {
             "consentVersion",
             "grantedAt",
             "revokedAt",
-            "isActive"
+            "isActive",
+
+            // Call log metadata
+            "durationSeconds",
+            "callType",
+            "totalCallsToday",
+            "callsLastHour"
         )
 
         /**

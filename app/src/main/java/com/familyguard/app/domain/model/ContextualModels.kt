@@ -8,7 +8,15 @@ data class ContextualStateReport(
     val recentAppActivity: List<AppContext>,
     val notificationSummary: NotificationSummary,
     val usageSummary: UsageSummary,
-    val dailyInsights: DailyInsights
+    val dailyInsights: DailyInsights,
+    val callLogSummary: CallLogSummary? = null
+)
+
+data class CallLogSummary(
+    val totalCallsToday: Int,
+    val callsLastHour: Int,
+    val totalDurationSecondsToday: Long,
+    val durationSecondsLastHour: Long
 )
 
 data class AppContext(

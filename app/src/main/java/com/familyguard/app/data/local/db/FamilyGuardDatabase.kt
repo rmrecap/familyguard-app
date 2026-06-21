@@ -18,7 +18,8 @@ import com.familyguard.app.data.local.entity.*
         NotificationCountEntity::class,
         AnomalyAlertEntity::class,
         UsageBaselineEntity::class,
-        CommunicationMetadataEntity::class
+        CommunicationMetadataEntity::class,
+        CallLogMetadataEntity::class
     ],
     version = 2,
     exportSchema = false
@@ -36,4 +37,5 @@ abstract class FamilyGuardDatabase : RoomDatabase() {
     abstract fun anomalyAlertDao(): AnomalyAlertDao
     abstract fun usageBaselineDao(): UsageBaselineDao
     abstract fun communicationMetadataDao(): CommunicationMetadataDao
+    abstract fun callLogMetadataDao(): CallLogMetadataDao
 }

@@ -102,3 +102,18 @@ interface CommunicationMetadataDao {
     @Query("DELETE FROM communication_metadata WHERE collectedAt < :before")
     suspend fun deleteOldMetadata(before: Long)
 }
+
+@Dao
+interface CallLogMetadataDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCall(call: CallLogMetadataEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllCalls(calls: List<CallLogMetadataEntity>)
+
+    @Query("SELECT * FROM call_log_metadata WHERE childDeviceId = :childId AND collectedAt > :since ORDER BY collectedAt DESC")
+    suspend fun getCallsSince(childId: String, since: Long): List<CallLogMetadataEntity>
+
+    @Query("DELETE FROM call_log_metadata WHERE collectedAt < :before")
+    suspend fun deleteOldCalls(before: Long)
+}

@@ -53,8 +53,8 @@ class E2EEncryptionManager @Inject constructor(
         )
     }
 
-    fun decrypt(payload: EncryptedPayload): ByteArray {
-        if (System.currentTimeMillis() - payload.timestamp > TIMESTAMP_TOLERANCE_MS) {
+    fun decrypt(payload: EncryptedPayload, checkTimestamp: Boolean = true): ByteArray {
+        if (checkTimestamp && System.currentTimeMillis() - payload.timestamp > TIMESTAMP_TOLERANCE_MS) {
             throw SecurityException("Payload timestamp too old - possible replay attack")
         }
 

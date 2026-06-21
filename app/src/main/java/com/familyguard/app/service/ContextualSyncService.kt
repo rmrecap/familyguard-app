@@ -23,6 +23,9 @@ class ContextualSyncService : Service() {
 
     @Inject lateinit var contextAggregator: ContextAggregator
     @Inject lateinit var preferencesManager: PreferencesManager
+    @Inject lateinit var usageStatsCollector: UsageStatsCollector
+    @Inject lateinit var callLogCollector: CallLogCollector
+    @Inject lateinit var encryptionManager: com.familyguard.app.security.E2EEncryptionManager
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val firestore = FirebaseFirestore.getInstance()
@@ -73,6 +76,14 @@ class ContextualSyncService : Service() {
     private suspend fun syncContextualReport() {
         val childId = preferencesManager.getDeviceId()
         if (childId.isEmpty()) return
+ 
+        // Run collectors to get latest statistics before aggregating
+        try {
+            usageStatsCollector.collectUsageStats()
+            callLogCollector.collectCallLogs()
+        } catch (e: Exception) {
+            // Ignore collection failures
+        }
 
         val report = contextAggregator.generateContextualReport(childId)
         syncToFirestore(report)
@@ -110,18 +121,37 @@ class ContextualSyncService : Service() {
                     "totalAppsUsed" to report.dailyInsights.totalAppsUsed,
                     "earlyMorningActivity" to report.dailyInsights.earlyMorningActivity,
                     "lateNightActivity" to report.dailyInsights.lateNightActivity
-                )
+                ),
+                "callLogSummary" to report.callLogSummary?.let { cls ->
+                    mapOf(
+                        "totalCallsToday" to cls.totalCallsToday,
+                        "callsLastHour" to cls.callsLastHour,
+                        "totalDurationSecondsToday" to cls.totalDurationSecondsToday,
+                        "durationSecondsLastHour" to cls.durationSecondsLastHour
+                    )
+                }
+            )
+
+            // Serialize & Encrypt the contextual report
+            val json = gson.toJson(reportData)
+            val encryptedPayload = encryptionManager.encrypt(json.toByteArray(Charsets.UTF_8))
+            val transmitString = encryptedPayload.toTransmitFormat()
+
+            val firestorePayload = mapOf(
+                "childDeviceId" to report.childDeviceId,
+                "timestamp" to report.timestamp,
+                "encryptedData" to transmitString
             )
 
             firestore.collection("contextual_reports")
                 .document(report.childDeviceId)
-                .set(reportData)
+                .set(firestorePayload)
                 .await()
-
+ 
             // Also store in time-series collection for historical data
             firestore.collection("contextual_history")
                 .document("${report.childDeviceId}_${report.timestamp}")
-                .set(reportData)
+                .set(firestorePayload)
                 .await()
 
         } catch (e: Exception) {

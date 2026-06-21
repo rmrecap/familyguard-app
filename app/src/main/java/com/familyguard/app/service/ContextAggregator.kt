@@ -15,6 +15,7 @@ class ContextAggregator @Inject constructor(
     private val appUsageStatsDao: AppUsageStatsDao,
     private val notificationCountDao: NotificationCountDao,
     private val deviceProfileDao: DeviceProfileDao,
+    private val callLogMetadataDao: CallLogMetadataDao,
     private val dataValidator: DataValidator
 ) {
     companion object {
@@ -58,6 +59,9 @@ class ContextAggregator @Inject constructor(
         // Get daily insights
         val dailyInsights = getDailyInsights(childDeviceId, startOfDay)
 
+        // Get call log summary
+        val callLogSummary = getCallLogSummary(childDeviceId, startOfDay, oneHourAgo)
+ 
         val report = ContextualStateReport(
             childDeviceId = childDeviceId,
             childName = childName,
@@ -66,7 +70,8 @@ class ContextAggregator @Inject constructor(
             recentAppActivity = recentActivity,
             notificationSummary = notificationSummary,
             usageSummary = usageSummary,
-            dailyInsights = dailyInsights
+            dailyInsights = dailyInsights,
+            callLogSummary = callLogSummary
         )
 
         // Validate the report data before returning
@@ -84,7 +89,11 @@ class ContextAggregator @Inject constructor(
         report.dailyInsights?.let {
             validationData["mostUsedApp"] = it.mostUsedApp ?: ""
         }
-
+        report.callLogSummary?.let {
+            validationData["totalCallsToday"] = it.totalCallsToday.toString()
+            validationData["callsLastHour"] = it.callsLastHour.toString()
+        }
+ 
         if (validationData.isNotEmpty()) {
             val validationResult = dataValidator.validateData(validationData, TAG)
             if (validationResult is DataValidator.ValidationResult.Invalid) {
@@ -114,6 +123,12 @@ class ContextAggregator @Inject constructor(
                         averageSessionLength = 0,
                         earlyMorningActivity = false,
                         lateNightActivity = false
+                    ),
+                    callLogSummary = CallLogSummary(
+                        totalCallsToday = 0,
+                        callsLastHour = 0,
+                        totalDurationSecondsToday = 0,
+                        durationSecondsLastHour = 0
                     )
                 )
             }
@@ -302,6 +317,27 @@ class ContextAggregator @Inject constructor(
         calendar.set(Calendar.SECOND, 0)
         calendar.set(Calendar.MILLISECOND, 0)
         return calendar.timeInMillis
+    }
+
+    private suspend fun getCallLogSummary(childId: String, startOfDay: Long, oneHourAgo: Long): CallLogSummary {
+        return try {
+            val callsToday = callLogMetadataDao.getCallsSince(childId, startOfDay)
+            val callsLastHour = callLogMetadataDao.getCallsSince(childId, oneHourAgo)
+
+            val totalCalls = callsToday.size
+            val lastHourCalls = callsLastHour.size
+            val totalDuration = callsToday.sumOf { it.durationSeconds }
+            val lastHourDuration = callsLastHour.sumOf { it.durationSeconds }
+
+            CallLogSummary(
+                totalCallsToday = totalCalls,
+                callsLastHour = lastHourCalls,
+                totalDurationSecondsToday = totalDuration,
+                durationSecondsLastHour = lastHourDuration
+            )
+        } catch (e: Exception) {
+            CallLogSummary(0, 0, 0, 0)
+        }
     }
 
     private fun getHourFromTimestamp(timestamp: Long): Int {

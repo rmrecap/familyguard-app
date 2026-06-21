@@ -68,3 +68,14 @@ data class CommunicationMetadataEntity(
     val collectedAt: Long,
     val childDeviceId: String
 )
+
+@Entity(tableName = "call_log_metadata")
+data class CallLogMetadataEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val durationSeconds: Long,
+    val callType: String,
+    val collectedAt: Long,
+    val hourOfDay: Int,
+    val dayOfWeek: Int,
+    val childDeviceId: String
+)

@@ -69,9 +69,15 @@ fun FamilyGuardApp() {
             navController.navigate(Routes.PARENT_DASHBOARD) {
                 popUpTo(Routes.ONBOARDING) { inclusive = true }
             }
-        } else if (uiState.isRegistered && uiState.role == DeviceRole.CHILD && uiState.isPaired && uiState.consentsGranted) {
-            navController.navigate(Routes.CHILD_DASHBOARD) {
-                popUpTo(Routes.ONBOARDING) { inclusive = true }
+        } else if (uiState.isRegistered && uiState.role == DeviceRole.CHILD && uiState.isPaired) {
+            if (uiState.consentsGranted) {
+                navController.navigate(Routes.CHILD_DASHBOARD) {
+                    popUpTo(Routes.ONBOARDING) { inclusive = true }
+                }
+            } else {
+                navController.navigate(Routes.CONSENT_SETUP) {
+                    popUpTo(Routes.ONBOARDING) { inclusive = true }
+                }
             }
         }
     }
