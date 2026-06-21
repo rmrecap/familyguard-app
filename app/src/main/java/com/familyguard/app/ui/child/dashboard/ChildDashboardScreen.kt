@@ -10,29 +10,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.familyguard.app.domain.model.Feature
 import com.familyguard.app.ui.theme.Error
-import com.familyguard.app.ui.theme.Success
-
-data class FeatureToggleUi(
-    val feature: Feature,
-    val enabled: Boolean
-)
+import com.familyguard.app.ui.viewmodel.ChildDashboardViewModel
 
 @Composable
 fun ChildDashboardScreen(
     onNavigateToSos: () -> Unit,
-    onNavigateToAuditLog: () -> Unit
+    onNavigateToAuditLog: () -> Unit,
+    viewModel: ChildDashboardViewModel = hiltViewModel()
 ) {
-    var features by remember {
-        mutableStateOf(
-            listOf(
-                FeatureToggleUi(Feature.LOCATION_SHARING, true),
-                FeatureToggleUi(Feature.SOS, true),
-                FeatureToggleUi(Feature.GEOFENCE, false),
-                FeatureToggleUi(Feature.SCREEN_TIME, false)
-            )
-        )
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadDashboard()
     }
 
     LazyColumn(
@@ -53,14 +45,21 @@ fun ChildDashboardScreen(
                         text = "FamilyGuard Active",
                         style = MaterialTheme.typography.headlineSmall
                     )
-                    Text(
-                        text = "Monitoring since 10:30 AM",
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                    Text(
-                        text = "Last synced: Just now",
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                    if (uiState.isTracking) {
+                        Text(
+                            text = "Monitoring since ${uiState.monitoringSince}",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            text = "Last synced: ${uiState.lastSynced}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    } else {
+                        Text(
+                            text = "Location sharing is off",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
             }
         }
@@ -73,7 +72,7 @@ fun ChildDashboardScreen(
             )
         }
 
-        items(features) { feature ->
+        items(Feature.entries.toList()) { feature ->
             Card(modifier = Modifier.fillMaxWidth()) {
                 Row(
                     modifier = Modifier
@@ -83,23 +82,19 @@ fun ChildDashboardScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = feature.feature.displayName,
+                            text = feature.displayName,
                             style = MaterialTheme.typography.titleMedium
                         )
                         Text(
-                            text = feature.feature.description,
+                            text = feature.description,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Switch(
-                        checked = feature.enabled,
+                        checked = uiState.consents[feature.id] ?: false,
                         onCheckedChange = { checked ->
-                            features = features.map {
-                                if (it.feature.id == feature.feature.id) {
-                                    it.copy(enabled = checked)
-                                } else it
-                            }
+                            viewModel.toggleFeature(feature, checked)
                         }
                     )
                 }
@@ -137,7 +132,7 @@ fun ChildDashboardScreen(
             Spacer(modifier = Modifier.height(16.dp))
 
             Button(
-                onClick = { /* Kill switch */ },
+                onClick = { viewModel.activateKillSwitch() },
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.error
@@ -147,6 +142,12 @@ fun ChildDashboardScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Stop All Monitoring")
             }
+        }
+    }
+
+    uiState.error?.let { error ->
+        LaunchedEffect(error) {
+            viewModel.clearError()
         }
     }
 }

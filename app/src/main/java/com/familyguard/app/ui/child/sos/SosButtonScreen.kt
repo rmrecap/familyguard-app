@@ -8,21 +8,33 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.familyguard.app.ui.theme.Error
 import com.familyguard.app.ui.theme.SOSRed
+import com.familyguard.app.ui.viewmodel.ChildDashboardViewModel
 
 @Composable
-fun SosButtonScreen(onBack: () -> Unit) {
+fun SosButtonScreen(
+    onBack: () -> Unit,
+    viewModel: ChildDashboardViewModel = hiltViewModel()
+) {
     var isTriggered by remember { mutableStateOf(false) }
     var countdown by remember { mutableIntStateOf(3) }
+    val uiState by viewModel.uiState.collectAsState()
 
     LaunchedEffect(isTriggered) {
         if (isTriggered && countdown > 0) {
             kotlinx.coroutines.delay(1000)
             countdown--
             if (countdown == 0) {
-                // SOS confirmed - send alert
+                viewModel.triggerSos()
             }
+        }
+    }
+
+    LaunchedEffect(uiState.sosTriggered) {
+        if (uiState.sosTriggered) {
+            // SOS sent successfully
         }
     }
 
@@ -43,7 +55,7 @@ fun SosButtonScreen(onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "Press and hold the button below to send an emergency alert to your parents with your current location.",
+                text = "Press the button below to send an emergency alert to your parents with your current location.",
                 style = MaterialTheme.typography.bodyLarge,
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -70,28 +82,49 @@ fun SosButtonScreen(onBack: () -> Unit) {
                 Text("Cancel")
             }
         } else {
-            Text(
-                text = "Sending SOS in $countdown...",
-                style = MaterialTheme.typography.headlineMedium,
-                color = Error
-            )
+            if (uiState.sosTriggered) {
+                Text(
+                    text = "SOS Alert Sent!",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            CircularProgressIndicator(
-                modifier = Modifier.size(100.dp),
-                color = Error
-            )
+                Text(
+                    text = "Your parents have been notified with your location.",
+                    style = MaterialTheme.typography.bodyLarge
+                )
 
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
-            TextButton(
-                onClick = {
-                    isTriggered = false
-                    countdown = 3
+                Button(onClick = onBack) {
+                    Text("Back to Dashboard")
                 }
-            ) {
-                Text("Cancel SOS", color = Error)
+            } else if (uiState.isLoading) {
+                Text(
+                    text = "Sending SOS in $countdown...",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = Error
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                CircularProgressIndicator(
+                    modifier = Modifier.size(100.dp),
+                    color = Error
+                )
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                TextButton(
+                    onClick = {
+                        isTriggered = false
+                        countdown = 3
+                    }
+                ) {
+                    Text("Cancel SOS", color = Error)
+                }
             }
         }
     }

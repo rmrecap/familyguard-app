@@ -10,27 +10,21 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.familyguard.app.ui.theme.Success
 import com.familyguard.app.ui.theme.Warning
-
-data class ChildUi(
-    val deviceId: String,
-    val name: String,
-    val lastSeen: String,
-    val isOnline: Boolean,
-    val lastLocation: String?
-)
+import com.familyguard.app.ui.viewmodel.ParentDashboardViewModel
 
 @Composable
 fun ParentDashboardScreen(
     onNavigateToLocation: () -> Unit,
-    onNavigateToAlerts: () -> Unit
+    onNavigateToAlerts: () -> Unit,
+    viewModel: ParentDashboardViewModel = hiltViewModel()
 ) {
-    val children = remember {
-        mutableStateListOf(
-            ChildUi("1", "Sarah", "2 min ago", true, "Home"),
-            ChildUi("2", "Mike", "15 min ago", true, "School")
-        )
+    val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(Unit) {
+        viewModel.loadDashboard()
     }
 
     LazyColumn(
@@ -76,15 +70,13 @@ fun ParentDashboardScreen(
         }
 
         item {
-            Text(
-                text = "Family Members",
-                style = MaterialTheme.typography.titleLarge,
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-        }
-
-        items(children) { child ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                onClick = onNavigateToAlerts,
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.errorContainer
+                )
+            ) {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -92,32 +84,127 @@ fun ParentDashboardScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Person,
+                        Icons.Default.Warning,
                         contentDescription = null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.error
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(child.name, style = MaterialTheme.typography.titleMedium)
+                    Column {
+                        Text("View Alerts", style = MaterialTheme.typography.titleMedium)
+                        Text("Check safety alerts", style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+
+        if (uiState.inviteCode.isNotEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text("Family Invite Code", style = MaterialTheme.typography.titleMedium)
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "Last seen: ${child.lastSeen}",
+                            text = uiState.inviteCode,
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Share this code with your child to pair their device",
                             style = MaterialTheme.typography.bodySmall
                         )
-                        if (child.lastLocation != null) {
-                            Text(
-                                "Location: ${child.lastLocation}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
-                    Icon(
-                        Icons.Default.Circle,
-                        contentDescription = null,
-                        tint = if (child.isOnline) Success else Warning,
-                        modifier = Modifier.size(12.dp)
-                    )
+                }
+            }
+        }
+
+        item {
+            Text(
+                text = "Family Members",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        if (uiState.isLoading) {
+            item {
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator()
+                }
+            }
+        } else if (uiState.children.isEmpty()) {
+            item {
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            Icons.Default.PersonAdd,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("No children paired yet", style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            "Share your invite code with your child",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                }
+            }
+        } else {
+            items(uiState.children) { child ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Person,
+                            contentDescription = null,
+                            modifier = Modifier.size(40.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(child.name, style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Last seen: ${child.lastSeen}",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            if (child.lastLocation.isNotEmpty()) {
+                                Text(
+                                    "Location: ${child.lastLocation}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Icon(
+                            Icons.Default.Circle,
+                            contentDescription = null,
+                            tint = if (child.isOnline) Success else Warning,
+                            modifier = Modifier.size(12.dp)
+                        )
+                    }
                 }
             }
         }

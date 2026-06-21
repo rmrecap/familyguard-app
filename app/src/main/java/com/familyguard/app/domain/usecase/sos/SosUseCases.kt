@@ -16,8 +16,8 @@ class TriggerSosUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(
         childDeviceId: String,
-        latitude: Double,
-        longitude: Double,
+        latitude: Double = 0.0,
+        longitude: Double = 0.0,
         alertType: SosType = SosType.PANIC_BUTTON
     ): Result<String> {
         return try {
@@ -85,7 +85,7 @@ class CancelSosUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(
         alertId: String,
-        cancelledBy: String
+        cancelledBy: String = ""
     ): Result<Unit> {
         return try {
             sosDao.updateAlertStatus(

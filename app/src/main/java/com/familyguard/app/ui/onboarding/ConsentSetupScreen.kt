@@ -20,16 +20,26 @@ data class ConsentItem(
 )
 
 @Composable
-fun ConsentSetupScreen(onComplete: () -> Unit) {
+fun ConsentSetupScreen(
+    consentsGranted: Boolean,
+    onGrantConsents: (List<Feature>) -> Unit,
+    onComplete: () -> Unit
+) {
     var consentItems by remember {
         mutableStateOf(
             listOf(
-                ConsentItem(Feature.LOCATION_SHARING, Icons.Default.LocationOn),
-                ConsentItem(Feature.SOS, Icons.Default.Warning),
-                ConsentItem(Feature.GEOFENCE, Icons.Default.Fence),
-                ConsentItem(Feature.SCREEN_TIME, Icons.Default.Timer)
+                ConsentItem(Feature.LOCATION_SHARING, Icons.Default.LocationOn, true),
+                ConsentItem(Feature.SOS, Icons.Default.Warning, true),
+                ConsentItem(Feature.GEOFENCE, Icons.Default.Fence, true),
+                ConsentItem(Feature.SCREEN_TIME, Icons.Default.Timer, false)
             )
         )
+    }
+
+    LaunchedEffect(consentsGranted) {
+        if (consentsGranted) {
+            onComplete()
+        }
     }
 
     Column(
@@ -102,7 +112,10 @@ fun ConsentSetupScreen(onComplete: () -> Unit) {
         Spacer(modifier = Modifier.height(16.dp))
 
         Button(
-            onClick = onComplete,
+            onClick = {
+                val grantedFeatures = consentItems.filter { it.granted }.map { it.feature }
+                onGrantConsents(grantedFeatures)
+            },
             modifier = Modifier.fillMaxWidth(),
             enabled = consentItems.any { it.granted }
         ) {

@@ -7,17 +7,23 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.familyguard.app.domain.model.DeviceRole
 import com.familyguard.app.ui.navigation.Routes
 import com.familyguard.app.ui.navigation.Screen
 import com.familyguard.app.ui.onboarding.OnboardingScreen
+import com.familyguard.app.ui.onboarding.RoleSelectionScreen
+import com.familyguard.app.ui.onboarding.ConsentSetupScreen
+import com.familyguard.app.ui.onboarding.FamilyPairingScreen
 import com.familyguard.app.ui.parent.dashboard.ParentDashboardScreen
 import com.familyguard.app.ui.child.dashboard.ChildDashboardScreen
 import com.familyguard.app.ui.child.sos.SosButtonScreen
+import com.familyguard.app.ui.viewmodel.RegistrationViewModel
 import com.familyguard.app.ui.theme.FamilyGuardTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -44,6 +50,8 @@ fun FamilyGuardApp() {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val registrationViewModel: RegistrationViewModel = hiltViewModel()
+    val uiState by registrationViewModel.uiState.collectAsState()
 
     val bottomBarScreens = listOf(
         Screen.ParentDashboard,
@@ -54,6 +62,19 @@ fun FamilyGuardApp() {
     )
 
     val showBottomBar = currentRoute in bottomBarScreens.map { it.route }
+
+    // Auto-navigate after registration/pairing
+    LaunchedEffect(uiState.isRegistered, uiState.isPaired, uiState.consentsGranted) {
+        if (uiState.isRegistered && uiState.role == DeviceRole.PARENT && uiState.isPaired) {
+            navController.navigate(Routes.PARENT_DASHBOARD) {
+                popUpTo(Routes.ONBOARDING) { inclusive = true }
+            }
+        } else if (uiState.isRegistered && uiState.role == DeviceRole.CHILD && uiState.isPaired && uiState.consentsGranted) {
+            navController.navigate(Routes.CHILD_DASHBOARD) {
+                popUpTo(Routes.ONBOARDING) { inclusive = true }
+            }
+        }
+    }
 
     Scaffold(
         bottomBar = {
@@ -93,22 +114,47 @@ fun FamilyGuardApp() {
             }
 
             composable(Routes.ROLE_SELECTION) {
-                com.familyguard.app.ui.onboarding.RoleSelectionScreen(
+                RoleSelectionScreen(
+                    isLoading = uiState.isLoading,
                     onSelectParent = {
-                        navController.navigate(Routes.PARENT_DASHBOARD) {
-                            popUpTo(Routes.ONBOARDING) { inclusive = true }
-                        }
+                        registrationViewModel.createFamily()
                     },
                     onSelectChild = {
-                        navController.navigate(Routes.CONSENT_SETUP) {
-                            popUpTo(Routes.ONBOARDING) { inclusive = true }
+                        navController.navigate(Routes.FAMILY_PAIRING)
+                    },
+                    onRoleSelected = { role ->
+                        registrationViewModel.selectRole(role)
+                        if (role == DeviceRole.PARENT) {
+                            registrationViewModel.createFamily()
+                        } else {
+                            navController.navigate(Routes.FAMILY_PAIRING)
                         }
                     }
                 )
             }
 
+            composable(Routes.FAMILY_PAIRING) {
+                FamilyPairingScreen(
+                    isLoading = uiState.isLoading,
+                    error = uiState.error,
+                    onJoinFamily = { code ->
+                        registrationViewModel.joinFamily(code)
+                    },
+                    onBack = {
+                        navController.popBackStack()
+                    },
+                    onClearError = {
+                        registrationViewModel.clearError()
+                    }
+                )
+            }
+
             composable(Routes.CONSENT_SETUP) {
-                com.familyguard.app.ui.onboarding.ConsentSetupScreen(
+                ConsentSetupScreen(
+                    consentsGranted = uiState.consentsGranted,
+                    onGrantConsents = { features ->
+                        registrationViewModel.grantConsents(features)
+                    },
                     onComplete = {
                         navController.navigate(Routes.CHILD_DASHBOARD) {
                             popUpTo(Routes.ONBOARDING) { inclusive = true }

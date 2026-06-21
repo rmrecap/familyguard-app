@@ -5,15 +5,18 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChildCare
 import androidx.compose.material.icons.filled.SupervisorAccount
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.familyguard.app.domain.model.DeviceRole
 
 @Composable
 fun RoleSelectionScreen(
+    isLoading: Boolean,
     onSelectParent: () -> Unit,
-    onSelectChild: () -> Unit
+    onSelectChild: () -> Unit,
+    onRoleSelected: (DeviceRole) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -30,11 +33,16 @@ fun RoleSelectionScreen(
         Spacer(modifier = Modifier.height(48.dp))
 
         Card(
-            onClick = onSelectParent,
+            onClick = {
+                if (!isLoading) {
+                    onRoleSelected(DeviceRole.PARENT)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.primaryContainer
-            )
+            ),
+            enabled = !isLoading
         ) {
             Row(
                 modifier = Modifier
@@ -59,17 +67,26 @@ fun RoleSelectionScreen(
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
+                if (isLoading) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                }
             }
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
         Card(
-            onClick = onSelectChild,
+            onClick = {
+                if (!isLoading) {
+                    onRoleSelected(DeviceRole.CHILD)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer
-            )
+            ),
+            enabled = !isLoading
         ) {
             Row(
                 modifier = Modifier
