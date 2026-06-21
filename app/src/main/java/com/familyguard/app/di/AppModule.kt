@@ -1,8 +1,8 @@
 package com.familyguard.app.di
 
 import android.content.Context
+import android.os.Build
 import androidx.room.Room
-import com.familyguard.app.BuildConfig
 import com.familyguard.app.data.local.dao.*
 import com.familyguard.app.data.local.db.FamilyGuardDatabase
 import com.familyguard.app.data.remote.api.SyncApi
@@ -91,7 +91,7 @@ object NetworkModule {
     @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit {
         // Use localhost for development, production URL for release
-        val baseUrl = if (BuildConfig.DEBUG) {
+        val baseUrl = if (Build.TYPE == "debug") {
             "http://10.0.2.2:3000/v1/"  // Android emulator localhost
         } else {
             "https://familyguard-api.onrender.com/v1/"
