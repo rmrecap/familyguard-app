@@ -21,6 +21,7 @@ server/*.log
 # Firebase
 app/google-services.json
 server/config/firebase-config.json
+server/config/serviceAccountKey.json
 
 # IDE
 .idea

@@ -6,17 +6,32 @@ const rateLimit = require('express-rate-limit');
 const admin = require('firebase-admin');
 const { Pool } = require('pg');
 const winston = require('winston');
+const path = require('path');
+const fs = require('fs');
 
-// Initialize Firebase Admin
-const firebaseConfig = {
-  credential: admin.credential.cert({
+// Initialize Firebase Admin - try service account file first, then env vars
+let firebaseCredential;
+const serviceAccountPath = path.join(__dirname, 'config', 'serviceAccountKey.json');
+
+if (fs.existsSync(serviceAccountPath)) {
+  const serviceAccount = require(serviceAccountPath);
+  firebaseCredential = admin.credential.cert(serviceAccount);
+  console.log('Firebase initialized with service account file');
+} else if (process.env.FIREBASE_PROJECT_ID && process.env.FIREBASE_PRIVATE_KEY && process.env.FIREBASE_CLIENT_EMAIL) {
+  firebaseCredential = admin.credential.cert({
     projectId: process.env.FIREBASE_PROJECT_ID,
     privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-  }),
-};
+  });
+  console.log('Firebase initialized with environment variables');
+} else {
+  console.warn('Firebase credentials not found - push notifications will not work');
+  firebaseCredential = null;
+}
 
-admin.initializeApp(firebaseConfig);
+if (firebaseCredential) {
+  admin.initializeApp({ credential: firebaseCredential });
+}
 
 // Database connection
 const pool = new Pool({
