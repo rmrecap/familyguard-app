@@ -74,6 +74,12 @@
             android:foregroundServiceType="dataSync" />
 
         <service
+            android:name=".service.ContextualSyncService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <service
             android:name=".service.NotificationCountCollector"
             android:enabled="true"
             android:exported="true"

@@ -7,16 +7,19 @@ import androidx.lifecycle.viewModelScope
 import com.familyguard.app.data.local.PreferencesManager
 import com.familyguard.app.data.local.dao.DeviceProfileDao
 import com.familyguard.app.data.local.dao.LocationDao
-import com.familyguard.app.data.local.entity.DeviceProfileEntity
-import com.familyguard.app.domain.model.DeviceRole
+import com.familyguard.app.domain.model.*
+import com.familyguard.app.service.ContextualSyncService
 import com.familyguard.app.service.LocationTrackingService
 import com.familyguard.app.service.SyncService
+import com.google.firebase.firestore.FirebaseFirestore
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.tasks.await
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import javax.inject.Inject
 
 data class ChildUi(
@@ -24,7 +27,8 @@ data class ChildUi(
     val name: String,
     val lastSeen: String,
     val isOnline: Boolean,
-    val lastLocation: String
+    val lastLocation: String,
+    val contextualReport: ContextualStateReport? = null
 )
 
 data class ParentDashboardUiState(
@@ -46,8 +50,11 @@ class ParentDashboardViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(ParentDashboardUiState())
     val uiState: StateFlow<ParentDashboardUiState> = _uiState.asStateFlow()
 
+    private val firestore = FirebaseFirestore.getInstance()
+
     init {
         loadDashboard()
+        startContextualSync()
     }
 
     fun loadDashboard() {
@@ -63,6 +70,8 @@ class ParentDashboardViewModel @Inject constructor(
                 val timeAgo = formatTimeAgo(lastSeenMs)
                 val isOnline = (System.currentTimeMillis() - lastSeenMs) < 5 * 60 * 1000
 
+                val contextualReport = loadContextualReport(device.deviceId)
+
                 ChildUi(
                     deviceId = device.deviceId,
                     name = device.deviceName,
@@ -70,7 +79,8 @@ class ParentDashboardViewModel @Inject constructor(
                     isOnline = isOnline,
                     lastLocation = if (latestLocation != null) {
                         "${String.format("%.4f", latestLocation.latitude)}, ${String.format("%.4f", latestLocation.longitude)}"
-                    } else "Unknown"
+                    } else "Unknown",
+                    contextualReport = contextualReport
                 )
             }
 
@@ -80,6 +90,86 @@ class ParentDashboardViewModel @Inject constructor(
                 inviteCode = inviteCode
             )
         }
+    }
+
+    private suspend fun loadContextualReport(childDeviceId: String): ContextualStateReport? {
+        return try {
+            val doc = firestore.collection("contextual_reports")
+                .document(childDeviceId)
+                .get()
+                .await()
+
+            if (doc.exists()) {
+                val data = doc.data ?: return null
+
+                val currentForegroundAppData = data["currentForegroundApp"] as? Map<String, Any>
+                val currentForegroundApp = currentForegroundAppData?.let { app ->
+                    AppContext(
+                        packageName = app["packageName"] as? String ?: "",
+                        appName = app["appName"] as? String ?: "",
+                        isCurrentlyActive = app["isCurrentlyActive"] as? Boolean ?: false,
+                        usageMinutesToday = app["usageMinutesToday"] as? Long ?: 0,
+                        usageMinutesLastHour = app["usageMinutesLastHour"] as? Long ?: 0,
+                        notificationCountLastHour = app["notificationCountLastHour"] as? Int ?: 0,
+                        lastUsedTimestamp = System.currentTimeMillis()
+                    )
+                }
+
+                val notificationSummaryData = data["notificationSummary"] as? Map<String, Any>
+                val notificationSummary = notificationSummaryData?.let { ns ->
+                    NotificationSummary(
+                        totalNotificationsToday = ns["totalNotificationsToday"] as? Int ?: 0,
+                        notificationsLastHour = ns["notificationsLastHour"] as? Int ?: 0,
+                        topAppsByNotifications = emptyList(),
+                        notificationTrend = try {
+                            TrendDirection.valueOf(ns["notificationTrend"] as? String ?: "STABLE")
+                        } catch (e: Exception) { TrendDirection.STABLE }
+                    )
+                }
+
+                val usageSummaryData = data["usageSummary"] as? Map<String, Any>
+                val usageSummary = usageSummaryData?.let { us ->
+                    UsageSummary(
+                        totalScreenTimeToday = us["totalScreenTimeToday"] as? Long ?: 0,
+                        screenTimeLastHour = us["screenTimeLastHour"] as? Long ?: 0,
+                        topAppsByUsage = emptyList(),
+                        usageTrend = try {
+                            TrendDirection.valueOf(us["usageTrend"] as? String ?: "STABLE")
+                        } catch (e: Exception) { TrendDirection.STABLE }
+                    )
+                }
+
+                val dailyInsightsData = data["dailyInsights"] as? Map<String, Any>
+                val dailyInsights = dailyInsightsData?.let { di ->
+                    DailyInsights(
+                        mostUsedApp = di["mostUsedApp"] as? String,
+                        peakActivityHour = di["peakActivityHour"] as? Int ?: 12,
+                        totalAppsUsed = di["totalAppsUsed"] as? Int ?: 0,
+                        averageSessionLength = 0,
+                        earlyMorningActivity = di["earlyMorningActivity"] as? Boolean ?: false,
+                        lateNightActivity = di["lateNightActivity"] as? Boolean ?: false
+                    )
+                }
+
+                ContextualStateReport(
+                    childDeviceId = childDeviceId,
+                    childName = data["childName"] as? String ?: "Child",
+                    timestamp = data["timestamp"] as? Long ?: System.currentTimeMillis(),
+                    currentForegroundApp = currentForegroundApp,
+                    recentAppActivity = emptyList(),
+                    notificationSummary = notificationSummary ?: NotificationSummary(0, 0, emptyList(), TrendDirection.STABLE),
+                    usageSummary = usageSummary ?: UsageSummary(0, 0, emptyList(), TrendDirection.STABLE),
+                    dailyInsights = dailyInsights ?: DailyInsights(null, 12, 0, 0, false, false)
+                )
+            } else null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun startContextualSync() {
+        val intent = Intent(context, ContextualSyncService::class.java)
+        context.startForegroundService(intent)
     }
 
     fun startLocationTracking() {
@@ -95,6 +185,11 @@ class ParentDashboardViewModel @Inject constructor(
             action = "ACTION_STOP"
         }
         context.startService(intent)
+
+        val syncIntent = Intent(context, ContextualSyncService::class.java).apply {
+            action = "ACTION_STOP"
+        }
+        context.startService(syncIntent)
     }
 
     private fun formatTimeAgo(timestamp: Long): String {
