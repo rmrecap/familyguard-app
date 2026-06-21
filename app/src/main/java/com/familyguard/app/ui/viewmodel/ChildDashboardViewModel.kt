@@ -132,10 +132,11 @@ class ChildDashboardViewModel @Inject constructor(
     }
 
     fun activateKillSwitch() {
+        val deviceId = preferencesManager.getDeviceId()
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true)
 
-            val result = activateKillSwitchUseCase()
+            val result = activateKillSwitchUseCase(deviceId)
             result.fold(
                 onSuccess = {
                     stopLocationTracking()
