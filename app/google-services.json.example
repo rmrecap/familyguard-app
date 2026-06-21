@@ -1,16 +1,16 @@
-// Firebase Configuration for FamilyGuard
-// Replace this file with your actual google-services.json from Firebase Console
+# Firebase Configuration for FamilyGuard Android App
+# This file is generated from your Firebase project settings
 
 {
   "project_info": {
-    "project_number": "YOUR_PROJECT_NUMBER",
-    "project_id": "YOUR_PROJECT_ID",
-    "storage_bucket": "YOUR_PROJECT_ID.appspot.com"
+    "project_number": "575338691718",
+    "project_id": "familyguard-app-f3ede",
+    "storage_bucket": "familyguard-app-f3ede.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:YOUR_PROJECT_NUMBER:android:YOUR_APP_ID",
+        "mobilesdk_app_id": "1:575338691718:android:4808cc195850e5b673a507",
         "android_client_info": {
           "package_name": "com.familyguard.app"
         }
@@ -18,7 +18,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "YOUR_API_KEY"
+          "current_key": "AIzaSyALpQm1w1wtgfjnl-cbmUJ0R2FOSetElgw"
         }
       ],
       "services": {
