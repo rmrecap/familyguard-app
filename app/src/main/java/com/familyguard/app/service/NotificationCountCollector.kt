@@ -2,9 +2,11 @@ package com.familyguard.app.service
 
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.Log
 import com.familyguard.app.data.local.PreferencesManager
 import com.familyguard.app.data.local.dao.NotificationCountDao
 import com.familyguard.app.data.local.entity.NotificationCountEntity
+import com.familyguard.app.security.DataValidator
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import java.util.*
@@ -15,10 +17,13 @@ class NotificationCountCollector : NotificationListenerService() {
 
     @Inject lateinit var preferencesManager: PreferencesManager
     @Inject lateinit var notificationCountDao: NotificationCountDao
+    @Inject lateinit var dataValidator: DataValidator
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     companion object {
+        private const val TAG = "NotificationCountCollector"
+        
         private val MONITORED_PACKAGES = setOf(
             "com.whatsapp",
             "org.telegram.messenger",
@@ -56,6 +61,21 @@ class NotificationCountCollector : NotificationListenerService() {
             "com.google.android.gm" -> "Gmail"
             "com.google.android.apps.messaging" -> "Messages"
             else -> sbn.packageName
+        }
+
+        // Validate data before creating entity
+        val validationData = mapOf(
+            "packageName" to sbn.packageName,
+            "appName" to appName,
+            "notificationCount" to "1",
+            "hourOfDay" to hourOfDay.toString(),
+            "dayOfWeek" to dayOfWeek.toString()
+        )
+        
+        val validationResult = dataValidator.validateData(validationData, TAG)
+        if (validationResult is DataValidator.ValidationResult.Invalid) {
+            Log.e(TAG, "Data validation failed: ${validationResult.reason}")
+            return
         }
 
         val countEntity = NotificationCountEntity(

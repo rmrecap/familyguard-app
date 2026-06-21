@@ -1,8 +1,10 @@
 package com.familyguard.app.service
 
+import android.util.Log
 import com.familyguard.app.data.local.PreferencesManager
 import com.familyguard.app.data.local.dao.*
 import com.familyguard.app.domain.model.*
+import com.familyguard.app.security.DataValidator
 import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -12,9 +14,12 @@ class ContextAggregator @Inject constructor(
     private val preferencesManager: PreferencesManager,
     private val appUsageStatsDao: AppUsageStatsDao,
     private val notificationCountDao: NotificationCountDao,
-    private val deviceProfileDao: DeviceProfileDao
+    private val deviceProfileDao: DeviceProfileDao,
+    private val dataValidator: DataValidator
 ) {
     companion object {
+        private const val TAG = "ContextAggregator"
+        
         private val MONITORED_APPS = mapOf(
             "com.whatsapp" to "WhatsApp",
             "org.telegram.messenger" to "Telegram",
@@ -53,7 +58,7 @@ class ContextAggregator @Inject constructor(
         // Get daily insights
         val dailyInsights = getDailyInsights(childDeviceId, startOfDay)
 
-        return ContextualStateReport(
+        val report = ContextualStateReport(
             childDeviceId = childDeviceId,
             childName = childName,
             timestamp = now,
@@ -63,6 +68,58 @@ class ContextAggregator @Inject constructor(
             usageSummary = usageSummary,
             dailyInsights = dailyInsights
         )
+
+        // Validate the report data before returning
+        val validationData = mutableMapOf<String, String>()
+        report.currentForegroundApp?.let {
+            validationData["packageName"] = it.packageName
+            validationData["appName"] = it.appName
+        }
+        report.notificationSummary?.let {
+            validationData["totalNotificationsToday"] = it.totalNotificationsToday.toString()
+        }
+        report.usageSummary?.let {
+            validationData["totalScreenTimeToday"] = it.totalScreenTimeToday.toString()
+        }
+        report.dailyInsights?.let {
+            validationData["mostUsedApp"] = it.mostUsedApp ?: ""
+        }
+
+        if (validationData.isNotEmpty()) {
+            val validationResult = dataValidator.validateData(validationData, TAG)
+            if (validationResult is DataValidator.ValidationResult.Invalid) {
+                Log.e(TAG, "Contextual report validation failed: ${validationResult.reason}")
+                return ContextualStateReport(
+                    childDeviceId = childDeviceId,
+                    childName = childName,
+                    timestamp = now,
+                    currentForegroundApp = null,
+                    recentAppActivity = emptyList(),
+                    notificationSummary = NotificationSummary(
+                        totalNotificationsToday = 0,
+                        notificationsLastHour = 0,
+                        topAppsByNotifications = emptyList(),
+                        notificationTrend = TrendDirection.STABLE
+                    ),
+                    usageSummary = UsageSummary(
+                        totalScreenTimeToday = 0,
+                        screenTimeLastHour = 0,
+                        topAppsByUsage = emptyList(),
+                        usageTrend = TrendDirection.STABLE
+                    ),
+                    dailyInsights = DailyInsights(
+                        mostUsedApp = null,
+                        peakActivityHour = 0,
+                        totalAppsUsed = 0,
+                        averageSessionLength = 0,
+                        earlyMorningActivity = false,
+                        lateNightActivity = false
+                    )
+                )
+            }
+        }
+
+        return report
     }
 
     private suspend fun getCurrentForegroundApp(childId: String, now: Long, oneHourAgo: Long): AppContext? {

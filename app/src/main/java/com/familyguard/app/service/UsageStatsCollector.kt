@@ -4,11 +4,13 @@ import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.familyguard.app.data.local.PreferencesManager
 import com.familyguard.app.data.local.dao.AppUsageStatsDao
 import com.familyguard.app.data.local.dao.CommunicationMetadataDao
 import com.familyguard.app.data.local.entity.AppUsageStatsEntity
 import com.familyguard.app.data.local.entity.CommunicationMetadataEntity
+import com.familyguard.app.security.DataValidator
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.util.*
@@ -20,9 +22,12 @@ class UsageStatsCollector @Inject constructor(
     @ApplicationContext private val context: Context,
     private val preferencesManager: PreferencesManager,
     private val appUsageStatsDao: AppUsageStatsDao,
-    private val communicationMetadataDao: CommunicationMetadataDao
+    private val communicationMetadataDao: CommunicationMetadataDao,
+    private val dataValidator: DataValidator
 ) {
     companion object {
+        private const val TAG = "UsageStatsCollector"
+        
         // Messaging and social media apps to monitor (metadata only)
         val MONITORED_APPS = mapOf(
             "com.whatsapp" to "WhatsApp",
@@ -85,6 +90,21 @@ class UsageStatsCollector @Inject constructor(
                 val packageName = usageStats.packageName
                 if (MONITORED_APPS.containsKey(packageName)) {
                     val usageMinutes = (usageStats.totalTimeInForeground / 60000)
+                    
+                    // Validate data before creating entities
+                    val validationData = mapOf(
+                        "packageName" to packageName,
+                        "appName" to (MONITORED_APPS[packageName] ?: packageName),
+                        "usageTimeMinutes" to usageMinutes.toString(),
+                        "lastUsedTimestamp" to usageStats.lastTimeUsed.toString()
+                    )
+                    
+                    val validationResult = dataValidator.validateData(validationData, TAG)
+                    if (validationResult is DataValidator.ValidationResult.Invalid) {
+                        Log.e(TAG, "Data validation failed: ${validationResult.reason}")
+                        return
+                    }
+                    
                     val appStats = AppUsageStatsEntity(
                         packageName = packageName,
                         appName = MONITORED_APPS[packageName] ?: packageName,
