@@ -29,6 +29,8 @@ class LocationTrackingService : Service() {
         const val NOTIFICATION_ID = 1001
         const val CHANNEL_ID = "transparency"
         const val LOCATION_INTERVAL_MS = 15000L // 15 seconds
+        /** Maximum acceptable horizontal accuracy in meters. Fixes worse than this are discarded. */
+        const val MAX_ACCEPTABLE_ACCURACY_M = 100f
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -67,11 +69,14 @@ class LocationTrackingService : Service() {
     private fun startLocationUpdates() {
         val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL_MS)
             .setMinUpdateIntervalMillis(LOCATION_INTERVAL_MS / 2)
+            .setMinUpdateDistanceMeters(10f)  // Suppress redundant near-duplicate fixes
             .build()
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(result: LocationResult) {
                 result.lastLocation?.let { location ->
+                    // Accuracy gate: discard garbage fixes before any processing
+                    if (location.accuracy > MAX_ACCEPTABLE_ACCURACY_M) return
                     scope.launch {
                         val deviceId = loadDeviceId()
                         updateLocationUseCase(

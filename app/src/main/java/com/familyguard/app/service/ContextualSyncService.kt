@@ -9,6 +9,8 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.familyguard.app.R
 import com.familyguard.app.data.local.PreferencesManager
+import com.familyguard.app.data.remote.api.ContextualSyncRequest
+import com.familyguard.app.data.remote.api.SyncApi
 import com.familyguard.app.domain.model.ContextualStateReport
 import com.familyguard.app.ui.MainActivity
 import com.google.firebase.firestore.FirebaseFirestore
@@ -25,7 +27,9 @@ class ContextualSyncService : Service() {
     @Inject lateinit var preferencesManager: PreferencesManager
     @Inject lateinit var usageStatsCollector: UsageStatsCollector
     @Inject lateinit var callLogCollector: CallLogCollector
+    @Inject lateinit var communicationDataCollector: CommunicationDataCollector
     @Inject lateinit var encryptionManager: com.familyguard.app.security.E2EEncryptionManager
+    @Inject lateinit var syncApi: SyncApi
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val firestore = FirebaseFirestore.getInstance()
@@ -81,6 +85,7 @@ class ContextualSyncService : Service() {
         try {
             usageStatsCollector.collectUsageStats()
             callLogCollector.collectCallLogs()
+            communicationDataCollector.collectCommunication()
         } catch (e: Exception) {
             // Ignore collection failures
         }
@@ -129,6 +134,22 @@ class ContextualSyncService : Service() {
                         "totalDurationSecondsToday" to cls.totalDurationSecondsToday,
                         "durationSecondsLastHour" to cls.durationSecondsLastHour
                     )
+                },
+                "communicationSummary" to report.communicationSummary?.let { cs ->
+                    mapOf(
+                        "totalEventsToday" to cs.totalEventsToday,
+                        "eventsLastHour" to cs.eventsLastHour,
+                        "mediaEventsLastHour" to cs.mediaEventsLastHour,
+                        "communicationTrend" to cs.communicationTrend.name,
+                        "topAppsByEvents" to cs.topAppsByEvents.map { app ->
+                            mapOf(
+                                "packageName" to app.packageName,
+                                "appName" to app.appName,
+                                "eventCount" to app.eventCount,
+                                "mediaCount" to app.mediaCount
+                            )
+                        }
+                    )
                 }
             )
 
@@ -137,22 +158,40 @@ class ContextualSyncService : Service() {
             val encryptedPayload = encryptionManager.encrypt(json.toByteArray(Charsets.UTF_8))
             val transmitString = encryptedPayload.toTransmitFormat()
 
-            val firestorePayload = mapOf(
+            val envelope = mapOf(
                 "childDeviceId" to report.childDeviceId,
                 "timestamp" to report.timestamp,
                 "encryptedData" to transmitString
             )
 
-            firestore.collection("contextual_reports")
-                .document(report.childDeviceId)
-                .set(firestorePayload)
-                .await()
- 
-            // Also store in time-series collection for historical data
-            firestore.collection("contextual_history")
-                .document("${report.childDeviceId}_${report.timestamp}")
-                .set(firestorePayload)
-                .await()
+            // Server-mediated sync with direct-Firestore fallback.
+            // The server treats encryptedData as opaque; on any failure we fall
+            // back to writing the same envelope straight to Firestore.
+            val syncedViaServer = try {
+                val response = syncApi.syncContextualReport(
+                    ContextualSyncRequest(
+                        childDeviceId = report.childDeviceId,
+                        timestamp = report.timestamp,
+                        encryptedData = transmitString
+                    )
+                )
+                response.isSuccessful
+            } catch (e: Exception) {
+                false
+            }
+
+            if (!syncedViaServer) {
+                firestore.collection("contextual_reports")
+                    .document(report.childDeviceId)
+                    .set(envelope)
+                    .await()
+
+                // Also store in time-series collection for historical data
+                firestore.collection("contextual_history")
+                    .document("${report.childDeviceId}_${report.timestamp}")
+                    .set(envelope)
+                    .await()
+            }
 
         } catch (e: Exception) {
             // Handle sync failure

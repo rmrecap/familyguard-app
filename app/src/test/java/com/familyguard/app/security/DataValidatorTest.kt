@@ -27,19 +27,19 @@ class DataValidatorTest {
     }
 
     @Test
-    fun `validateData returns Invalid for blacklisted pattern in value`() {
+    fun `validateData returns Invalid for blacklisted value pattern`() {
+        // PII (phone numbers) is still blocked even when the field name is allowed
         val data = mapOf(
-            "packageName" to "com.whatsapp",
-            "message_content" to "Hello, how are you?"
+            "packageName" to "+15551234567"
         )
 
         val result = dataValidator.validateData(data, "Test")
         assertTrue(result is DataValidator.ValidationResult.Invalid)
-        assertEquals("message_content", (result as DataValidator.ValidationResult.Invalid).blockedField)
     }
 
     @Test
-    fun `validateData returns Invalid for disallowed field`() {
+    fun `validateData returns Invalid for disallowed field name`() {
+        // Field name not on the allowlist is rejected (the field-name gate stays)
         val data = mapOf(
             "packageName" to "com.whatsapp",
             "sms_content" to "Private message"
@@ -98,7 +98,8 @@ class DataValidatorTest {
 
     @Test
     fun `validateValue returns Invalid for forbidden pattern in value`() {
-        val result = dataValidator.validateValue("Hello world", "message_content", "Test")
+        // password remains on the blacklist
+        val result = dataValidator.validateValue("mysecret", "password", "Test")
         assertTrue(result is DataValidator.ValidationResult.Invalid)
     }
 
@@ -140,9 +141,10 @@ class DataValidatorTest {
     }
 
     @Test
-    fun `validateData returns Invalid for photo pattern`() {
+    fun `validateData returns Invalid for file_content pattern`() {
+        // file_content remains blacklisted (raw file/media content identifiers)
         val data = mapOf(
-            "mediaFile" to "photo.jpg"
+            "appName" to "file_content"
         )
 
         val result = dataValidator.validateData(data, "Test")
@@ -287,5 +289,65 @@ class DataValidatorTest {
 
         val result = dataValidator.validateData(data, "Test")
         assertTrue(result is DataValidator.ValidationResult.Valid)
+    }
+
+    @Test
+    fun `validateData allows communication metadata fields`() {
+        val data = mapOf(
+            "eventCategory" to "msg",
+            "hasMedia" to "true",
+            "mediaCount" to "3",
+            "eventCount" to "12",
+            "totalEventsToday" to "45",
+            "eventsLastHour" to "7",
+            "mediaEventsLastHour" to "2",
+            "communicationTrend" to "INCREASING"
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Valid)
+    }
+
+    @Test
+    fun `validateData allows short notification snippet`() {
+        val data = mapOf(
+            "packageName" to "com.whatsapp",
+            "snippet" to "New message"
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Valid)
+    }
+
+    @Test
+    fun `validateData rejects snippet containing a phone number`() {
+        // PII regex still strips phone numbers out of the relaxed snippet field
+        val data = mapOf(
+            "snippet" to "Call me +15551234567"
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Invalid)
+    }
+
+    @Test
+    fun `validateData rejects snippet longer than max value length`() {
+        val overLimit = "a".repeat(DataValidator.MAX_VALUE_LENGTH + 1)
+        val data = mapOf(
+            "snippet" to overLimit
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Invalid)
+    }
+
+    @Test
+    fun `validateData rejects email that sneaks into allowed field`() {
+        val data = mapOf(
+            "appName" to "user@example.com"
+        )
+
+        val result = dataValidator.validateData(data, "Test")
+        assertTrue(result is DataValidator.ValidationResult.Invalid)
     }
 }

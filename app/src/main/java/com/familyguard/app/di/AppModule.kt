@@ -99,11 +99,14 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(client: OkHttpClient): Retrofit {
-        // Use localhost for development, production URL for release
+        // Use localhost for development, production URL for release.
+        // Note: routes are mounted under /api/v1 on the server, so the base URL
+        // must include that prefix for relative Retrofit paths (e.g. "sync/location")
+        // to resolve correctly.
         val baseUrl = if (Build.TYPE == "debug") {
-            "http://10.0.2.2:3000/v1/"  // Android emulator localhost
+            "http://10.0.2.2:3000/api/v1/"  // Android emulator localhost
         } else {
-            "https://familyguard-api.onrender.com/v1/"
+            "https://familyguard-api.onrender.com/api/v1/"
         }
         
         return Retrofit.Builder()

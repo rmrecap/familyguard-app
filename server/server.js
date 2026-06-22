@@ -85,6 +85,7 @@ app.use('/api/v1/device', require('./routes/device'));
 app.use('/api/v1/family', require('./routes/family'));
 app.use('/api/v1/sync', require('./routes/sync'));
 app.use('/api/v1/alerts', require('./routes/alerts'));
+app.use('/api/v1/contextual', require('./routes/contextual'));
 app.use('/api/v1/health', require('./routes/health'));
 
 // Error handling middleware

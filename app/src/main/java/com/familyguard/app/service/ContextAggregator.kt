@@ -16,6 +16,7 @@ class ContextAggregator @Inject constructor(
     private val notificationCountDao: NotificationCountDao,
     private val deviceProfileDao: DeviceProfileDao,
     private val callLogMetadataDao: CallLogMetadataDao,
+    private val communicationEventDao: CommunicationEventDao,
     private val dataValidator: DataValidator
 ) {
     companion object {
@@ -61,7 +62,10 @@ class ContextAggregator @Inject constructor(
 
         // Get call log summary
         val callLogSummary = getCallLogSummary(childDeviceId, startOfDay, oneHourAgo)
- 
+
+        // Get communication summary
+        val communicationSummary = getCommunicationSummary(childDeviceId, startOfDay, oneHourAgo)
+
         val report = ContextualStateReport(
             childDeviceId = childDeviceId,
             childName = childName,
@@ -71,7 +75,8 @@ class ContextAggregator @Inject constructor(
             notificationSummary = notificationSummary,
             usageSummary = usageSummary,
             dailyInsights = dailyInsights,
-            callLogSummary = callLogSummary
+            callLogSummary = callLogSummary,
+            communicationSummary = communicationSummary
         )
 
         // Validate the report data before returning
@@ -92,6 +97,10 @@ class ContextAggregator @Inject constructor(
         report.callLogSummary?.let {
             validationData["totalCallsToday"] = it.totalCallsToday.toString()
             validationData["callsLastHour"] = it.callsLastHour.toString()
+        }
+        report.communicationSummary?.let {
+            validationData["totalEventsToday"] = it.totalEventsToday.toString()
+            validationData["eventsLastHour"] = it.eventsLastHour.toString()
         }
  
         if (validationData.isNotEmpty()) {
@@ -129,6 +138,13 @@ class ContextAggregator @Inject constructor(
                         callsLastHour = 0,
                         totalDurationSecondsToday = 0,
                         durationSecondsLastHour = 0
+                    ),
+                    communicationSummary = CommunicationSummary(
+                        totalEventsToday = 0,
+                        eventsLastHour = 0,
+                        mediaEventsLastHour = 0,
+                        topAppsByEvents = emptyList(),
+                        communicationTrend = TrendDirection.STABLE
                     )
                 )
             }
@@ -337,6 +353,69 @@ class ContextAggregator @Inject constructor(
             )
         } catch (e: Exception) {
             CallLogSummary(0, 0, 0, 0)
+        }
+    }
+
+    private suspend fun getCommunicationSummary(
+        childId: String,
+        startOfDay: Long,
+        oneHourAgo: Long
+    ): CommunicationSummary {
+        return try {
+            val eventsToday = communicationEventDao.getEventsSince(childId, startOfDay)
+            val eventsLastHour = communicationEventDao.getEventsSince(childId, oneHourAgo)
+            val mediaLastHour = communicationEventDao.getMediaEventCount(childId, oneHourAgo)
+
+            val topApps = eventsToday
+                .groupBy { it.packageName }
+                .map { (packageName, events) ->
+                    AppEventCount(
+                        packageName = packageName,
+                        appName = events.first().appName,
+                        eventCount = events.size,
+                        mediaCount = events.count { it.hasMedia }
+                    )
+                }
+                .sortedByDescending { it.eventCount }
+                .take(5)
+
+            val trend = calculateCommunicationTrend(eventsLastHour)
+
+            CommunicationSummary(
+                totalEventsToday = eventsToday.size,
+                eventsLastHour = eventsLastHour.size,
+                mediaEventsLastHour = mediaLastHour,
+                topAppsByEvents = topApps,
+                communicationTrend = trend
+            )
+        } catch (e: Exception) {
+            CommunicationSummary(
+                totalEventsToday = 0,
+                eventsLastHour = 0,
+                mediaEventsLastHour = 0,
+                topAppsByEvents = emptyList(),
+                communicationTrend = TrendDirection.STABLE
+            )
+        }
+    }
+
+    private fun calculateCommunicationTrend(
+        recentEvents: List<com.familyguard.app.data.local.entity.CommunicationEventEntity>
+    ): TrendDirection {
+        if (recentEvents.size < 2) return TrendDirection.STABLE
+
+        val recent = recentEvents.takeLast(recentEvents.size / 2)
+        val older = recentEvents.take(recentEvents.size / 2)
+
+        val recentCount = recent.size
+        val olderCount = older.size
+        if (olderCount == 0) return if (recentCount > 0) TrendDirection.SPIKE else TrendDirection.STABLE
+
+        return when {
+            recentCount > olderCount * 2 -> TrendDirection.SPIKE
+            recentCount > olderCount * 1.5 -> TrendDirection.INCREASING
+            recentCount < olderCount * 0.5 -> TrendDirection.DECREASING
+            else -> TrendDirection.STABLE
         }
     }
 

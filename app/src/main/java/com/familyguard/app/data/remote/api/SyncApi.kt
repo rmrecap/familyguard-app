@@ -32,6 +32,19 @@ data class FamilyPairingRequest(
     val deviceId: String
 )
 
+/**
+ * Encrypted contextual report envelope POSTed to the Node server.
+ *
+ * [encryptedData] is the E2EE transmit format (Base64(iv + ciphertext)) produced
+ * by E2EEncryptionManager; the server treats it as opaque and writes it to
+ * Firestore unchanged.
+ */
+data class ContextualSyncRequest(
+    val childDeviceId: String,
+    val timestamp: Long,
+    val encryptedData: String
+)
+
 interface SyncApi {
 
     @POST("device/register")
@@ -60,4 +73,7 @@ interface SyncApi {
 
     @GET("sync/pull/{deviceId}")
     suspend fun pullPendingData(@Path("deviceId") deviceId: String): Response<SyncResponse>
+
+    @POST("contextual/report")
+    suspend fun syncContextualReport(@Body request: ContextualSyncRequest): Response<SyncResponse>
 }

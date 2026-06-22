@@ -62,6 +62,19 @@ enum class ContextualConsentType(
             "Notification count in last hour"
         ),
         explicitStatement = "We share ONLY the name of the currently active app and usage duration. No content from within apps is shared."
+    ),
+    COMMUNICATION_METADATA(
+        id = "communication_metadata",
+        displayName = "Communication Activity Insights",
+        description = "Capture messaging-app activity metadata for safety insights",
+        dataCollected = listOf(
+            "App name (e.g., WhatsApp, Telegram)",
+            "Number of communication events per app",
+            "Whether a notification contained media (true/false, no file)",
+            "Notification category (e.g., msg, social)",
+            "A short (<=40 character) notification preview"
+        ),
+        explicitStatement = "We collect app names, event counts, a media-presence flag, and a short notification preview (<=40 characters). We do NOT read full message text, access photos/videos/audio files, contact names, or phone numbers. Previews are filtered to strip phone numbers, emails, and URLs."
     )
 }
 
@@ -88,28 +101,29 @@ object ConsentConstants {
     )
     
     val REQUIRED_CONSENTS_FOR_FULL_FEATURES = REQUIRED_CONSENTS_FOR_CONTEXTUAL_AWARENESS + listOf(
-        ContextualConsentType.LOCATION_SHARING
+        ContextualConsentType.LOCATION_SHARING,
+        ContextualConsentType.COMMUNICATION_METADATA
     )
 }
 
 object PrivacyPromises {
-    const val NEVER_COLLECTS_MESSAGE_CONTENT = "We never read, store, or transmit message content"
+    const val LIMITED_MESSAGE_PREVIEWS = "We may store short (<=40 character) notification previews from messaging apps; we never read or store full message text"
     const val NEVER_COLLECTS_CONTACT_NAMES = "We never access contact lists or names"
-    const val NEVER_COLLECTS_PHOTOS = "We never access photos or media files"
+    const val NEVER_COLLECTS_MEDIA_FILES = "We never access photo, video, or audio file contents; we only record whether a notification contained media"
     const val NEVER_COLLECTS_BROWSING_HISTORY = "We never track web browsing activity"
     const val NEVER_COLLECTS_PASSWORDS = "We never access passwords or credentials"
-    const val METADATA_ONLY = "We collect ONLY: app names, usage times, notification counts"
+    const val METADATA_FIRST = "We primarily collect app names, usage times, and notification counts; short previews are optional and filtered to remove phone numbers, emails, and URLs"
     const val ON_DEVICE_PROCESSING = "All analysis happens on-device"
     const val USER_CONTROL = "You can revoke any consent at any time"
     const val TRANSPARENT_NOTIFICATION = "App always shows when monitoring is active"
-    
+
     val ALL_PROMISES = listOf(
-        NEVER_COLLECTS_MESSAGE_CONTENT,
+        LIMITED_MESSAGE_PREVIEWS,
         NEVER_COLLECTS_CONTACT_NAMES,
-        NEVER_COLLECTS_PHOTOS,
+        NEVER_COLLECTS_MEDIA_FILES,
         NEVER_COLLECTS_BROWSING_HISTORY,
         NEVER_COLLECTS_PASSWORDS,
-        METADATA_ONLY,
+        METADATA_FIRST,
         ON_DEVICE_PROCESSING,
         USER_CONTROL,
         TRANSPARENT_NOTIFICATION

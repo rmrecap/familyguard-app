@@ -117,3 +117,27 @@ interface CallLogMetadataDao {
     @Query("DELETE FROM call_log_metadata WHERE collectedAt < :before")
     suspend fun deleteOldCalls(before: Long)
 }
+
+@Dao
+interface CommunicationEventDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertEvent(event: CommunicationEventEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAllEvents(events: List<CommunicationEventEntity>)
+
+    @Query("SELECT * FROM communication_events WHERE childDeviceId = :childId AND collectedAt > :since ORDER BY collectedAt DESC")
+    suspend fun getEventsSince(childId: String, since: Long): List<CommunicationEventEntity>
+
+    @Query("SELECT * FROM communication_events WHERE childDeviceId = :childId AND packageName = :packageName AND collectedAt > :since ORDER BY collectedAt DESC")
+    suspend fun getEventsForApp(childId: String, packageName: String, since: Long): List<CommunicationEventEntity>
+
+    @Query("SELECT COUNT(*) FROM communication_events WHERE childDeviceId = :childId AND hasMedia = 1 AND collectedAt > :since")
+    suspend fun getMediaEventCount(childId: String, since: Long): Int
+
+    @Query("SELECT * FROM communication_events WHERE childDeviceId = :childId ORDER BY collectedAt DESC LIMIT 1")
+    suspend fun getLatestEvent(childId: String): CommunicationEventEntity?
+
+    @Query("DELETE FROM communication_events WHERE collectedAt < :before")
+    suspend fun deleteOldEvents(before: Long)
+}

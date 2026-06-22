@@ -79,3 +79,24 @@ data class CallLogMetadataEntity(
     val dayOfWeek: Int,
     val childDeviceId: String
 )
+
+/**
+ * Per-notification communication metadata captured by the notification listener.
+ *
+ * Privacy: only metadata is stored. [snippet] is a length-capped (<=40 chars)
+ * preview, only populated when the DataValidator allows it. No full message
+ * content, contact names, phone numbers, or media bytes are ever stored.
+ */
+@Entity(tableName = "communication_events")
+data class CommunicationEventEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val packageName: String,
+    val appName: String,
+    val eventCategory: String,
+    val hasMedia: Boolean,
+    val snippet: String?,
+    val hourOfDay: Int,
+    val dayOfWeek: Int,
+    val collectedAt: Long,
+    val childDeviceId: String
+)

@@ -21,23 +21,19 @@ class DataValidator @Inject constructor() {
     companion object {
         /**
          * BLACKLISTED PATTERNS - These patterns MUST NEVER appear in collected data
-         * 
+         *
          * If any of these patterns are detected in any data structure,
          * the validation FAILS and the data is BLOCKED.
+         *
+         * NOTE: The "message_*" / "chat_*" / "text_*" / media-content substrings were
+         * removed to allow a controlled communication-metadata field set (capped
+         * notification previews, media-presence flags, event categories). PII
+         * (contacts, phone numbers, emails), credentials, browsing and financial
+         * data remain unconditionally blocked below, and CONTENT_DETECTION_PATTERNS
+         * still strips long/base64/PII-looking values from the relaxed fields.
          */
         val FORBIDDEN_PATTERNS = setOf(
-            // Message content patterns
-            "message_content",
-            "message_text",
-            "sms_content",
-            "chat_content",
-            "text_content",
-            "body_text",
-            "message_body",
-            "conversation",
-            "thread_content",
-            
-            // Contact patterns
+            // Contact / PII patterns (kept)
             "contact_name",
             "contact_number",
             "phone_number",
@@ -46,38 +42,32 @@ class DataValidator @Inject constructor() {
             "address_book",
             "sender_name",
             "recipient_name",
-            
-            // Media patterns
-            "photo",
-            "image",
-            "video",
-            "audio",
-            "media_file",
-            "attachment",
+
+            // Raw file-content identifiers (kept; media-presence is captured as a boolean flag instead)
             "file_content",
             "document",
-            
-            // Browsing patterns
+
+            // Browsing patterns (kept)
             "url",
             "website",
             "browser_history",
             "search_query",
             "browsing_data",
-            
-            // Password/credential patterns
+
+            // Password/credential patterns (kept)
             "password",
             "credential",
             "token",
             "secret",
             "api_key",
             "private_key",
-            
-            // Location patterns (beyond what's explicitly collected)
+
+            // Location patterns beyond what's explicitly collected (kept)
             "home_address",
             "work_address",
             "gps_raw",
-            
-            // Private data patterns
+
+            // Private data patterns (kept)
             "financial",
             "medical",
             "health",
@@ -152,29 +142,50 @@ class DataValidator @Inject constructor() {
             "durationSeconds",
             "callType",
             "totalCallsToday",
-            "callsLastHour"
+            "callsLastHour",
+
+            // Communication metadata (relaxed: counts, media flags, capped previews)
+            "eventCategory",
+            "hasMedia",
+            "snippet",
+            "mediaCount",
+            "eventCount",
+            "totalEventsToday",
+            "eventsLastHour",
+            "mediaEventsLastHour",
+            "communicationTrend",
+            "topAppsByEvents"
         )
 
         /**
+         * Maximum length a string value may have before it is rejected as
+         * content-like. Kept tight (40) so notification previews can pass while
+         * free-form message bodies cannot.
+         */
+        const val MAX_VALUE_LENGTH = 40
+
+        /**
          * REGEX PATTERNS for detecting content-like data
-         * These patterns catch attempts to sneak in private content
+         * These patterns catch attempts to sneak in private content.
+         *
+         * NOTE: The generic "string longer than 50 chars" rule was removed so that
+         * short notification previews can pass. The length cap is instead enforced
+         * at [MAX_VALUE_LENGTH] (40) in checkContentPatterns. The PII regexes
+         * (phone numbers, emails, URLs, base64, long JSON values) remain.
          */
         val CONTENT_DETECTION_PATTERNS = setOf(
-            // Message-like content (long strings that look like messages)
-            Regex("""^.{50,}$"""),  // Strings longer than 50 chars (likely content)
-            
             // Phone number patterns
             Regex("""\+?\d{10,15}"""),  // Phone numbers
-            
+
             // Email patterns
             Regex("""[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"""),  // Email addresses
-            
+
             // URL patterns
             Regex("""https?://[^\s]+"""),  // URLs
-            
+
             // Base64 encoded data (could be encrypted content)
             Regex("""^[A-Za-z0-9+/]{40,}={0,2}$"""),  // Base64 strings
-            
+
             // JSON-like structures (could contain nested content)
             Regex("""\{[^}]*"[^"]*":\s*"[^"]{20,}"[^}]*\}"""),  // JSON with long values
         )
@@ -280,11 +291,11 @@ class DataValidator @Inject constructor() {
     private fun checkContentPatterns(data: Map<String, Any>, context: String): ValidationResult {
         for ((key, value) in data) {
             val valueStr = value.toString()
-            
+
             // Check for content-like patterns (skip short strings)
-            if (valueStr.length > 50) {
+            if (valueStr.length > MAX_VALUE_LENGTH) {
                 return ValidationResult.Invalid(
-                    reason = "POTENTIAL CONTENT: Field '$key' contains a string longer than 50 characters, which may contain private content (context: $context)",
+                    reason = "POTENTIAL CONTENT: Field '$key' contains a string longer than $MAX_VALUE_LENGTH characters, which may contain private content (context: $context)",
                     blockedField = key
                 )
             }
